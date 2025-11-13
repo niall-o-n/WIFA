@@ -96,7 +96,7 @@ def weighted_quantile(
     return np.interp(quantiles, weighted_quantiles, values)
 
 
-def run_pywake(yamlFile, output_dir="output"):
+def run_pywake(yamlFile, output_dir="output", gen_database=False):
 
     from py_wake import HorizontalGrid
     from py_wake.wind_turbines.power_ct_functions import PowerCtFunctionList, PowerCtTabular, PowerCtFunctions
@@ -249,11 +249,22 @@ def run_pywake(yamlFile, output_dir="output"):
     #        resource_dat = yaml.safe_load(stream)
     #    except yaml.YAMLError as exc:
     #        print(exc)
+
     resource_dat = system_dat["site"]["energy_resource"]
-    WFXLB = np.min(system_dat["site"]["boundaries"]["polygons"][0]["x"])
-    WFXUB = np.max(system_dat["site"]["boundaries"]["polygons"][0]["x"])
-    WFYLB = np.min(system_dat["site"]["boundaries"]["polygons"][0]["y"])
-    WFYUB = np.max(system_dat["site"]["boundaries"]["polygons"][0]["y"])
+
+    try:
+        x_coords = system_dat["site"]["boundaries"]["polygons"][0]["x"]
+        y_coords = system_dat["site"]["boundaries"]["polygons"][1]["y"]
+    except IndexError:
+        x_coords = system_dat["site"]["boundaries"]["polygons"][0]["x"]
+        y_coords = system_dat["site"]["boundaries"]["polygons"][0]["y"]
+
+
+    WFXLB = np.min(x_coords)
+    WFXUB = np.max(x_coords)
+    WFYLB = np.min(y_coords)
+    WFYUB = np.max(y_coords)
+
     checkk = "flow_field" in system_dat["attributes"]["model_outputs_specification"]
     if checkk:
         checkk = "z_planes" in system_dat["attributes"]["model_outputs_specification"]["flow_field"]
@@ -348,8 +359,8 @@ def run_pywake(yamlFile, output_dir="output"):
             ):
                 z_planes = system_dat["attributes"]["model_outputs_specification"][
                     "flow_field"
-                ]
-                if z_planes != "hub_heights":
+                ]['z_planes']
+                if z_planes['z_sampling'] != "hub_heights":
                     additional_heights = system_dat["attributes"][
                         "model_outputs_specification"
                     ]["flow_field"]["z_planes"]["z_list"]
@@ -404,39 +415,69 @@ def run_pywake(yamlFile, output_dir="output"):
             if len(hub_heights) > 1:
                 TIs = []
                 seen = []
-                for hh in sorted(
-                    np.append(
-                        list(hub_heights.values()),
-                        system_dat["attributes"]["model_outputs_specification"][
-                            "flow_field"
-                        ]["z_planes"]["z_list"],
-                    )
-                ):
-                    # hh = hub_heights[tt]
-                    if heights:
-                        if hh in seen:
-                            continue
-                        seen.append(hh)
-                        try:
-                            ti_int = np.maximum(
-                                interp1d(heights, TI, axis=1, fill_value="extrapolate")(
-                                    hh
-                                ),
-                                2e-2,
-                            )
-                        except ValueError:
-                            ti_int = np.maximum(
-                                interp1d(
-                                    heights,
-                                    np.array(TI).T,
-                                    axis=1,
-                                    fill_value="extrapolate",
-                                )(hh),
-                                2e-2,
-                            )
-                    else:
-                        ti_int = TI
-                    TIs.append(ti_int[cases_idx])
+                if z_planes['z_sampling'] != "hub_heights":
+                    for hh in sorted(
+                        np.append(
+                            list(hub_heights.values()),
+                            system_dat["attributes"]["model_outputs_specification"][
+                                "flow_field"
+                            ]["z_planes"]["z_list"],
+                        )
+                    ):
+                        # hh = hub_heights[tt]
+                        if heights:
+                            if hh in seen:
+                                continue
+                            seen.append(hh)
+                            try:
+                                ti_int = np.maximum(
+                                    interp1d(heights, TI, axis=1, fill_value="extrapolate")(
+                                        hh
+                                    ),
+                                    2e-2,
+                                )
+                            except ValueError:
+                                ti_int = np.maximum(
+                                    interp1d(
+                                        heights,
+                                        np.array(TI).T,
+                                        axis=1,
+                                        fill_value="extrapolate",
+                                    )(hh),
+                                    2e-2,
+                                )
+                        else:
+                            ti_int = TI
+                        TIs.append(ti_int[cases_idx])
+                else:
+                    for hh in sorted(
+                            list(hub_heights.values())
+                    ):
+                        # hh = hub_heights[tt]
+                        if heights:
+                            if hh in seen:
+                                continue
+                            seen.append(hh)
+                            try:
+                                ti_int = np.maximum(
+                                    interp1d(heights, TI, axis=1, fill_value="extrapolate")(
+                                        hh
+                                    ),
+                                    2e-2,
+                                )
+                            except ValueError:
+                                ti_int = np.maximum(
+                                    interp1d(
+                                        heights,
+                                        np.array(TI).T,
+                                        axis=1,
+                                        fill_value="extrapolate",
+                                    )(hh),
+                                    2e-2,
+                                )
+                        else:
+                            ti_int = TI
+                        TIs.append(ti_int[cases_idx])
                 TI = ti_int
                 site = XRSite(
                     xr.Dataset(
@@ -577,6 +618,17 @@ def run_pywake(yamlFile, output_dir="output"):
         # deficit_param_mapping = {'k': 'k', 'ceps': 'ceps'}
     elif wind_deficit_model_data["name"] == "TurboPark":
         wakeModel = TurboGaussianDeficit
+        if (
+            "A"
+            in system_dat["attributes"]["analysis"]["wind_deficit_model"][
+                "wake_expansion_coefficient"
+            ]
+        ):
+            deficit_args["A"] = system_dat["attributes"]["analysis"][
+                "wind_deficit_model"
+            ]["wake_expansion_coefficient"]["A"]
+
+        # deficit_param_mapping = {'A': 'A', 'ceps': 'ceps'}
         # wake_deficit_key = 'WS_jlk'
     elif wind_deficit_model_data["name"].upper() == "FUGA":
         wakeModel = FugaDeficit
@@ -834,7 +886,12 @@ def run_pywake(yamlFile, output_dir="output"):
     #   data['FLOW_simulation_outputs']['computed_percentiles'] = system_dat['attributes']['analysis']['outputs']['power_percentiles']['percentiles']
     #   data['FLOW_simulation_outputs']['power_percentiles'] = power_percentiles
 
-    os.makedirs(output_dir, exist_ok=True)
+
+    if gen_database:
+        print("Hi")
+
+    else:
+        os.makedirs(output_dir, exist_ok=True)
     if "turbine_outputs" in system_dat["attributes"]["model_outputs_specification"]:
         # print('aep per turbine', list(aep_per_turbine)); hey
         # data['FLOW_simulation_outputs']['AEP_per_turbine'] = [float(value) for value in aep_per_turbine]
@@ -968,78 +1025,83 @@ def run_pywake(yamlFile, output_dir="output"):
             "model_outputs_specification"
         ]["flow_field"]
 
-    # Write out the YAML data
-    output_yaml_nam = output_dir + os.sep + "output.yaml"
-    #    with open(output_yaml_nam, 'w') as file:
-    #        yaml.dump(data, file, default_flow_style=False, allow_unicode=True)
-    #
-    #    with open(output_yaml_nam, 'r') as f:
-    #       yaml_content = f.read()
-    #
-    #    yaml_content = yaml_content.replace('INCLUDE_YAML_PLACEHOLDER', '!include recorded_inputs.yaml')
-    #
-    #    # Save the post-processed YAML
-    #    with open(output_yaml_nam, 'w') as f:
-    #       f.write(yaml_content)
+    if gen_database:
+        print("Hi")
 
-    ######################
-    # Construct Outputs
-    ####################
-    # Create a dictionary to represent the simplified YAML file structure
-    data = {
-        "wind_energy_system": "INCLUDE_YAML_PLACEHOLDER",
-        "power_table": "INCLUDE_POWER_TABLE_PLACEHOLDER",
-        "flow_field": "INCLUDE_FLOW_FIELD_PLACEHOLDER",
-    }
+    else:
 
-    # Write out the YAML data to the specified output directory
-    output_yaml_name = os.path.join(output_dir, "output.yaml")
-    with open(output_yaml_name, "w") as file:
-        yaml_content = yaml.dump(
-            data, file, default_flow_style=False, allow_unicode=True
+        # Write out the YAML data
+        output_yaml_nam = output_dir + os.sep + "output.yaml"
+        #    with open(output_yaml_nam, 'w') as file:
+        #        yaml.dump(data, file, default_flow_style=False, allow_unicode=True)
+        #
+        #    with open(output_yaml_nam, 'r') as f:
+        #       yaml_content = f.read()
+        #
+        #    yaml_content = yaml_content.replace('INCLUDE_YAML_PLACEHOLDER', '!include recorded_inputs.yaml')
+        #
+        #    # Save the post-processed YAML
+        #    with open(output_yaml_nam, 'w') as f:
+        #       f.write(yaml_content)
+
+        ######################
+        # Construct Outputs
+        ####################
+        # Create a dictionary to represent the simplified YAML file structure
+        data = {
+            "wind_energy_system": "INCLUDE_YAML_PLACEHOLDER",
+            "power_table": "INCLUDE_POWER_TABLE_PLACEHOLDER",
+            "flow_field": "INCLUDE_FLOW_FIELD_PLACEHOLDER",
+        }
+
+        # Write out the YAML data to the specified output directory
+        output_yaml_name = os.path.join(output_dir, "output.yaml")
+        with open(output_yaml_name, "w") as file:
+            yaml_content = yaml.dump(
+                data, file, default_flow_style=False, allow_unicode=True
+            )
+
+        # Replace placeholders with actual include directives, ensuring no quotes are used
+        with open(output_yaml_name, "r") as file:
+            yaml_content = file.read()
+
+        # yaml_content = yaml_content.replace('INCLUDE_YAML_PLACEHOLDER', '!include recorded_inputs.yaml')
+        #
+        ## Save the post-processed YAML
+        # with open(output_yaml_nam, 'w') as f:
+        #   f.write(yaml_content)
+        data = {
+            "wind_energy_system": "INCLUDE_YAML_PLACEHOLDER",
+            "power_table": "INCLUDE_POWER_TABLE_PLACEHOLDER",
+            "flow_field": "INCLUDE_FLOW_FIELD_PLACEHOLDER",
+        }
+
+        # Write out the YAML data to the specified output directory
+        output_yaml_name = os.path.join(output_dir, "output.yaml")
+        with open(output_yaml_name, "w") as file:
+            yaml_content = yaml.dump(
+                data, file, default_flow_style=False, allow_unicode=True
+            )
+
+        # Replace placeholders with actual include directives, ensuring no quotes are used
+        with open(output_yaml_name, "r") as file:
+            yaml_content = file.read()
+
+        yaml_content = yaml_content.replace(
+            "INCLUDE_YAML_PLACEHOLDER", "!include recorded_inputs.yaml"
+        )
+        yaml_content = yaml_content.replace(
+            "INCLUDE_POWER_TABLE_PLACEHOLDER", "!include PowerTable.nc"
+        )
+        yaml_content = yaml_content.replace(
+            "INCLUDE_FLOW_FIELD_PLACEHOLDER", "!include FarmFlow.nc"
         )
 
-    # Replace placeholders with actual include directives, ensuring no quotes are used
-    with open(output_yaml_name, "r") as file:
-        yaml_content = file.read()
+        # Save the post-processed YAML
+        with open(output_yaml_name, "w") as file:
+            file.write(yaml_content)
 
-    # yaml_content = yaml_content.replace('INCLUDE_YAML_PLACEHOLDER', '!include recorded_inputs.yaml')
-    #
-    ## Save the post-processed YAML
-    # with open(output_yaml_nam, 'w') as f:
-    #   f.write(yaml_content)
-    data = {
-        "wind_energy_system": "INCLUDE_YAML_PLACEHOLDER",
-        "power_table": "INCLUDE_POWER_TABLE_PLACEHOLDER",
-        "flow_field": "INCLUDE_FLOW_FIELD_PLACEHOLDER",
-    }
-
-    # Write out the YAML data to the specified output directory
-    output_yaml_name = os.path.join(output_dir, "output.yaml")
-    with open(output_yaml_name, "w") as file:
-        yaml_content = yaml.dump(
-            data, file, default_flow_style=False, allow_unicode=True
-        )
-
-    # Replace placeholders with actual include directives, ensuring no quotes are used
-    with open(output_yaml_name, "r") as file:
-        yaml_content = file.read()
-
-    yaml_content = yaml_content.replace(
-        "INCLUDE_YAML_PLACEHOLDER", "!include recorded_inputs.yaml"
-    )
-    yaml_content = yaml_content.replace(
-        "INCLUDE_POWER_TABLE_PLACEHOLDER", "!include PowerTable.nc"
-    )
-    yaml_content = yaml_content.replace(
-        "INCLUDE_FLOW_FIELD_PLACEHOLDER", "!include FarmFlow.nc"
-    )
-
-    # Save the post-processed YAML
-    with open(output_yaml_name, "w") as file:
-        file.write(yaml_content)
-
-    return aep
+        return aep
 
 
 def run():
