@@ -1,8 +1,10 @@
-import pytest
-from pathlib import Path
 import os
-from windIO import validate as validate_yaml, load_yaml
+from pathlib import Path
+
+import pytest
 from windIO import __path__ as wiop
+from windIO import load_yaml
+from windIO import validate as validate_yaml
 
 
 # Setup fixtures
@@ -28,6 +30,18 @@ def validate_system_yaml(
     yaml_fn = "wind_energy_system/" + system_fn
     system_yaml = base_path / case_path / yaml_fn
     validate_yaml(system_yaml, schema_path)
+
+
+def test_example_simulation_outputs():
+    file_path = Path("examples/cases/KUL_LES/observed_output/simulation_outputs.yaml")
+    data_to_validate = load_yaml(file_path)
+    validate_yaml(data_to_validate, "plant/simulation_outputs")
+
+
+def test_example_scada():
+    file_path = Path("examples/cases/open_source_scada/outputs/outputs.yaml")
+    data_to_validate = load_yaml(file_path)
+    validate_yaml(data_to_validate, "plant/scada_data")
 
 
 # Test cases
@@ -107,17 +121,18 @@ def test_windio_4turbines_profiles_stable_schema(base_path, windio_path, schema_
     )
     validate_yaml(grid_yaml, schema_path)
 
+
 def test_operating_flag_timeseries(base_path, windio_path, schema_path):
     base_yaml = (
         base_path / "timeseries_with_operating_flag/wind_energy_system/system.yaml"
     )
     validate_yaml(base_yaml, schema_path)
 
+
 def test_simple_wind_rose(base_path, windio_path, schema_path):
-    base_yaml = (
-        base_path / "simple_wind_rose/wind_energy_system/system.yaml"
-    )
+    base_yaml = base_path / "simple_wind_rose/wind_energy_system/system.yaml"
     validate_yaml(base_yaml, schema_path)
+
 
 def test_hetero_wind_rose(base_path, windio_path, schema_path):
     base_yaml = (
@@ -125,9 +140,7 @@ def test_hetero_wind_rose(base_path, windio_path, schema_path):
     )
     validate_yaml(base_yaml, schema_path)
 
-    base_yaml = (
-        base_path / "heterogeneous_wind_rose_map/wind_energy_system/system.yaml"
-    )
+    base_yaml = base_path / "heterogeneous_wind_rose_map/wind_energy_system/system.yaml"
     validate_yaml(base_yaml, schema_path)
 
 
