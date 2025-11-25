@@ -107,6 +107,7 @@ def run_pywake(yamlFile, output_dir="output"):
         TurboGaussianDeficit,
     )
     from py_wake.deficit_models.noj import NOJLocalDeficit
+    from py_wake.deficit_models import NiayifarGaussianDeficit,CarbajofuertesGaussianDeficit
     from py_wake.deflection_models import JimenezWakeDeflection
     from py_wake.examples.data.hornsrev1 import Hornsrev1Site
     from py_wake.rotor_avg_models import (
@@ -623,7 +624,6 @@ def run_pywake(yamlFile, output_dir="output"):
     print("Running deficit ", wind_deficit_model_data)
     if wind_deficit_model_data["name"] == "Jensen":
         wakeModel = NOJLocalDeficit
-        # deficit_param_mapping = {"k": "k", "k2": "k2"}
         if (
             "k_b"
             in system_dat["attributes"]["analysis"]["wind_deficit_model"][
@@ -675,9 +675,102 @@ def run_pywake(yamlFile, output_dir="output"):
         # deficit_param_mapping = {'k': 'k', 'ceps': 'ceps'}
         # from py_wake.deficit_models.utils import ct2a_mom1d
         # deficit_args['ct2a'] = ct2a_mom1d
+    elif wind_deficit_model_data["name"]=="Niayifar2016":
+        wakeModel=NiayifarGaussianDeficit
+        if (
+            "k_a" and "k_b"
+            in system_dat["attributes"]["analysis"]["wind_deficit_model"][
+                "wake_expansion_coefficient"
+            ]
+        ):
+            deficit_args["a"] = [
+                system_dat["attributes"]["analysis"][
+                "wind_deficit_model"
+            ]["wake_expansion_coefficient"]["k_a"],
+            system_dat["attributes"]["analysis"][
+                "wind_deficit_model"
+            ]["wake_expansion_coefficient"]["k_b"]
+            ]
+    elif wind_deficit_model_data["name"]=="Carbajo2018":
+        wakeModel=CarbajofuertesGaussianDeficit
+        if (
+            "k_a" and "k_b"
+            in system_dat["attributes"]["analysis"]["wind_deficit_model"][
+                "wake_expansion_coefficient"
+            ]
+        ):
+            deficit_args["a"] = [
+                system_dat["attributes"]["analysis"][
+                "wind_deficit_model"
+            ]["wake_expansion_coefficient"]["k_a"],
+            system_dat["attributes"]["analysis"][
+                "wind_deficit_model"
+            ]["wake_expansion_coefficient"]["k_b"]
+            ]
+
+        if (
+            "ceps_a" and "ceps_b"  
+            in system_dat["attributes"]["analysis"]["wind_deficit_model"]
+            ):
+
+            deficit_args["ceps"] = [
+            system_dat["attributes"]["analysis"][
+                "wind_deficit_model"
+            ]["ceps_a"],
+            system_dat["attributes"]["analysis"][
+                "wind_deficit_model"
+            ]["ceps_b"]
+            ]
+
     elif wind_deficit_model_data["name"] == "SuperGaussian":
         wakeModel = BlondelSuperGaussianDeficit2020
-        # deficit_param_mapping = {'k': 'k', 'ceps': 'ceps'}
+        if (
+            "a_s"
+            in system_dat["attributes"]["analysis"]["wind_deficit_model"][
+                "wake_expansion_coefficient"
+            ]
+        ):
+            deficit_args["a_s"] = system_dat["attributes"]["analysis"][
+                "wind_deficit_model"
+            ]["wake_expansion_coefficient"]["a_s"]
+        if (
+            "b_s"
+            in system_dat["attributes"]["analysis"]["wind_deficit_model"][
+                "wake_expansion_coefficient"
+            ]
+        ):
+            deficit_args["b_s"] = system_dat["attributes"]["analysis"][
+                "wind_deficit_model"
+            ]["wake_expansion_coefficient"]["b_s"]
+        if (
+            "c_s"
+            in system_dat["attributes"]["analysis"]["wind_deficit_model"][
+                "wake_expansion_coefficient"
+            ]
+        ):
+            deficit_args["c_s"] = system_dat["attributes"]["analysis"][
+                "wind_deficit_model"
+            ]["wake_expansion_coefficient"]["c_s"]
+        if (
+            "b_f"
+            in system_dat["attributes"]["analysis"]["wind_deficit_model"][
+                "wake_expansion_coefficient"
+            ]
+        ):
+            deficit_args["b_f"] = system_dat["attributes"]["analysis"][
+                "wind_deficit_model"
+            ]["wake_expansion_coefficient"]["b_f"]
+
+        if (
+            "c_f"
+            in system_dat["attributes"]["analysis"]["wind_deficit_model"][
+                "wake_expansion_coefficient"
+            ]
+        ):
+            deficit_args["c_f"] = system_dat["attributes"]["analysis"][
+                "wind_deficit_model"
+            ]["wake_expansion_coefficient"]["c_f"]
+
     elif wind_deficit_model_data["name"] == "TurboPark":
         wakeModel = TurboGaussianDeficit
         if (

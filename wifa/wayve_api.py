@@ -459,6 +459,7 @@ def ci_fitting(
         plt.legend()
         plt.tight_layout()
         plt.show()
+
     # CI altitudes
     inv_bottom = ci_estimate["h0"]
     H = ci_estimate["h1"]
@@ -476,7 +477,7 @@ def ci_fitting(
         dth = ci_estimate["dth"]
     # Lapse rate
     dthdz = ci_estimate["gamma"]
-    return inv_bottom, H, inv_top, th0, dth, dthdz
+    return inv_bottom, H, inv_top, th0, dth, dthdz,ths[zs <= max_z_fit],ci_estimate["thfit"],z_ci
 
 
 def read_turbine_type(turb_dat):
